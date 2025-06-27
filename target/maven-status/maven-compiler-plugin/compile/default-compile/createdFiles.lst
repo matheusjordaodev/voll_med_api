@@ -1,0 +1,8 @@
+med\voll\api\medico\Especialidade.class
+med\voll\api\controller\MedicoController.class
+med\voll\api\controller\HelloController.class
+med\voll\api\medico\DadosCadastroMedico.class
+med\voll\api\controller\PacienteController.class
+med\voll\api\ApiApplication.class
+med\voll\api\endereco\DadosEndereco.class
+med\voll\api\paciente\DadosCadastroPaciente.class
