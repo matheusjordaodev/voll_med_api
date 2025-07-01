@@ -63,4 +63,13 @@ public class MedicoController {
 
         return ResponseEntity.noContent().build();
     }
+
+
+    @GetMapping("/{id}")
+    public ResponseEntity detalhar(@PathVariable Long id){ //ResponseEntity é um formato padrão do Spring.
+        //Como capturar o id ? Com o PathVariable ele obtém essa informação a partir do dado que é fornecido no DeleteMapping.
+        var medico = medicoRepository.getReferenceById(id);
+
+        return ResponseEntity.ok(new DadosDetalhamentoMedico(medico));
+    }
 }
