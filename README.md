@@ -41,10 +41,41 @@ As seguintes tecnologias foram utilizadas no desenvolvimento da API Rest do proj
 
 ---
 
-## 📝 Licença
 
-Projeto desenvolvido por [Alura](https://www.alura.com.br) e utilizado nos cursos de Spring Boot.
 
-Instrutor: [Rodrigo Ferreira](https://cursos.alura.com.br/user/rodrigo-ferreira) 
+Este projeto **med.voll.api** é uma API RESTful para gerenciamento de médicos e pacientes, implementada com Spring Boot e Spring Security. A seguir, apresentamos um resumo das principais etapas e componentes documentados:
 
----
+## 1. Configuração de Segurança
+- **SecurityConfigurations**: define o filtro de segurança (`SecurityFilterChain`) usando lambdas, desativa CSRF e configura sessão stateless.
+- **AuthenticationManager**: exposto como bean para injeção em filtros e serviços.
+- **PasswordEncoder**: utiliza `BCryptPasswordEncoder` para hashing seguro de senhas.
+
+## 2. Autenticação JWT
+- **TokenService**: serviço que gera tokens JWT assinados com HMAC256, incluindo emissor, sujeito (login) e expiração em 2 horas (UTC-3).
+- **AutenticacaoController**: endpoint `POST /login` que recebe `DadosAutenticacao` (login e senha), autentica via `AuthenticationManager` e retorna `DadosTokenJWT` com o token gerado.
+
+## 3. Tratamento de Erros
+- **TratadorDeErros** (RestControllerAdvice): intercepta exceções:
+    - `EntityNotFoundException`: retorna HTTP 404.
+    - `MethodArgumentNotValidException`: retorna HTTP 400 com lista de erros de validação de campos.
+
+## 4. Domínio de Pacientes e Médicos
+- **Entidades**: `Paciente` e `Medico`, mapeadas com JPA (`@Entity`, `@Table`), incluem atributos, construtores a partir de DTOs e métodos de atualização e exclusão lógica (`ativo = false`).
+- **DTOs**:
+    - Cadastro: `DadosCadastroPaciente`, `DadosCadastroMedico` (contêm validações Bean Validation).
+    - Atualização: `DadosAtualizacaoPaciente`, `DadosAtualizacaoMedico`.
+    - Listagem: `DadosListagemPaciente`, `DadosListagemMedico`.
+    - Detalhamento: `DadosDetalhamentoMedico`.
+- **Endereço**: classe embutida `Endereco` e DTO `DadosEndereco` com validações.
+
+## 5. Repositórios
+- **PacienteRepository** e **MedicoRepository**: estendem `JpaRepository` e definem método `findAllByAtivoTrue(Pageable)` para paginação de registros ativos.
+
+## 6. Controladores REST
+- **PacienteController** (`/pacientes`): endpoints para cadastrar, listar (paginação), atualizar, excluir logicamente e detalhes de pacientes.
+- **MedicoController** (`/medicos`): endpoints para cadastrar (retorna 201 Created com Location), listar, atualizar, excluir e detalhar médicos.
+
+## Como Executar
+1. Defina a porta no `application.properties` (ex: `server.port=8081`).
+2. Configure propriedade `api.security.token.secret` no `application.properties`.
+3. Rode a aplicação com `mvn spring-boot:run` ou execute o JAR gerado.
