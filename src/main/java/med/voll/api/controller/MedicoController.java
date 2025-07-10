@@ -1,77 +1,122 @@
 package med.voll.api.controller;
 
-import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
-import med.voll.api.domain.medico.*;
+import med.voll.api.domain.medico.DadosListagemMedico;
+import med.voll.api.domain.medico.Medico;
+import med.voll.api.domain.medico.MedicoRepository;
+import med.voll.api.domain.medico.DadosCadastroMedico;
+import med.voll.api.domain.medico.DadosDetalhamentoMedico;
+import med.voll.api.domain.medico.DadosAtualizacaoMedico;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
+/**
+ * Controlador REST para gerenciamento de médicos.
+ * Fornece endpoints para cadastro, listagem, atualização, exclusão e detalhamento.
+ */
 @RestController
-@RequestMapping("/medicos")
+@RequestMapping("medicos")  // Base path para todos os endpoints: /medicos
 public class MedicoController {
+
     @Autowired
-    private MedicoRepository medicoRepository;
+    private MedicoRepository repository;  // Repositório JPA para operações com Médicos
+
+    /**
+     * Endpoint para cadastro de um novo médico.
+     * URL: POST /medicos
+     * - @RequestBody desserializa JSON em DadosCadastroMedico e @Valid aplica validações.
+     * - @Transactional garante commit no fim do método.
+     * - UriComponentsBuilder gera a URI do recurso criado.
+     */
     @PostMapping
     @Transactional
-    public ResponseEntity cadastrar(@RequestBody @Valid DadosCadastroMedico dados, UriComponentsBuilder uriBuilder) {
-        System.out.println(dados);
+    public ResponseEntity<DadosDetalhamentoMedico> cadastrar(
+            @RequestBody @Valid DadosCadastroMedico dados,
+            UriComponentsBuilder uriBuilder
+    ) {
+        // Cria a entidade Medico a partir dos dados recebidos
         var medico = new Medico(dados);
-        medicoRepository.save(medico);
-        //Quando Salvo os dados na API, devo salvar com o código 201, e devolver no cporpo da resposta,
-        //o recurso registrado com sucesso na aplicação e o recurso do cabeçalho do protocolo HTTP.(location)
-        //Que é onde o frontend consegue visualizar e usar os dados.
+        // Persiste no banco
+        repository.save(medico);
 
-        //como criar um objeto uri? A URI Tem que ser o endereço da api"
-        //O Spring tem uma classe que encapsula o endereço da URI, que a mesma faz a construção da URI da maneira dinâmica.
+        // Constrói URI para o recurso criado: /medicos/{id}
+        var uri = uriBuilder
+                .path("/medicos/{id}")
+                .buildAndExpand(medico.getId())
+                .toUri();
 
-        //toUri cria um objeto do tipo URI.
-        var uri = uriBuilder.path("/medicos/{id}").buildAndExpand(medico.getId()).toUri();
-        return ResponseEntity.created(uri).body(new DadosDetalhamentoMedico(medico));
+        // Retorna status 201 Created, cabeçalho Location e corpo com detalhes
+        return ResponseEntity.created(uri)
+                .body(new DadosDetalhamentoMedico(medico));
     }
 
+    /**
+     * Endpoint para listagem paginada de médicos ativos.
+     * URL: GET /medicos
+     * - @PageableDefault define tamanho e ordenação padrão (10 por página, ordenado por nome).
+     * - Retorna 200 OK com uma página de DadosListagemMedico.
+     */
     @GetMapping
-    public ResponseEntity<Page<DadosListagemMedico>> listar(@PageableDefault(size=2,sort={"nome"}) Pageable paginacao){
-        //return medicoRepository.findAll(paginacao).map(DadosListagemMedico::new);
-        var page =  medicoRepository.findAllByAtivoTrue(paginacao).map(DadosListagemMedico::new);
-        //Retorno Padrão Usando o Response Entity do Próprio SpringBoot. (Padrão para get)
+    public ResponseEntity<Page<DadosListagemMedico>> listar(
+            @PageableDefault(size = 10, sort = {"nome"}) Pageable paginacao
+    ) {
+        // Busca médicos com ativo=true e converte cada Medico para DadosListagemMedico
+        var page = repository.findAllByAtivoTrue(paginacao)
+                .map(DadosListagemMedico::new);
         return ResponseEntity.ok(page);
     }
 
-    //JPA faz o todo update, internamente.
-    //DTO evita o uso de Ataque via Injection a api ou a aplicação.
-
+    /**
+     * Endpoint para atualização de dados de um médico existente.
+     * URL: PUT /medicos
+     * - @RequestBody desserializa JSON em DadosAtualizacaoMedico e @Valid aplica validações.
+     * - @Transactional garante commit no fim do método.
+     * - Retorna 200 OK com detalhes atualizados.
+     */
     @PutMapping
-    public ResponseEntity atualizar(@RequestBody @Valid DadosAtualizacaoMedico dados){
-        var medico = medicoRepository.getReferenceById(dados.id());
-
+    @Transactional
+    public ResponseEntity<DadosDetalhamentoMedico> atualizar(
+            @RequestBody @Valid DadosAtualizacaoMedico dados
+    ) {
+        // Obtém referência "lazy" ao médico pelo ID (sem consulta imediata)
+        var medico = repository.getReferenceById(dados.id());
+        // Aplica mudanças somente nos campos não nulos
         medico.atualizarInformacoes(dados);
-        return  ResponseEntity.ok(new DadosDetalhamentoMedico(medico));
-        //Não é recomendado devolver uma entidade JPA, é recomendado devolver uM DTO do Objeto.
-
+        // Retorna detalhes atualizados
+        return ResponseEntity.ok(new DadosDetalhamentoMedico(medico));
     }
+
+    /**
+     * Endpoint para exclusão lógica de um médico.
+     * URL: DELETE /medicos/{id}
+     * - @PathVariable captura o ID na URL.
+     * - @Transactional garante commit no fim do método.
+     * - Retorna 204 No Content.
+     */
     @DeleteMapping("/{id}")
     @Transactional
-    public ResponseEntity excluir(@PathVariable Long id){ //ResponseEntity é um formato padrão do Spring.
-        //Como capturar o id ? Com o PathVariable ele obtém essa informação a partir do dado que é fornecido no DeleteMapping.
-        var medico = medicoRepository.getReferenceById(id);
-        medico.excluir();
-
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<Void> excluir(@PathVariable Long id) {
+        var medico = repository.getReferenceById(id);  // Obtém referência ao médico
+        medico.excluir();                              // Marca como inativo (exclusão lógica)
+        return ResponseEntity.noContent().build();     // Retorna status 204
     }
 
-
+    /**
+     * Endpoint para obter detalhes de um médico específico.
+     * URL: GET /medicos/{id}
+     * - @PathVariable captura o ID na URL.
+     * - Retorna 200 OK com DadosDetalhamentoMedico.
+     */
     @GetMapping("/{id}")
-    public ResponseEntity detalhar(@PathVariable Long id){ //ResponseEntity é um formato padrão do Spring.
-        //Como capturar o id ? Com o PathVariable ele obtém essa informação a partir do dado que é fornecido no DeleteMapping.
-        var medico = medicoRepository.getReferenceById(id);
-
+    public ResponseEntity<DadosDetalhamentoMedico> detalhar(@PathVariable Long id) {
+        var medico = repository.getReferenceById(id);  // Obtém referência ao médico
         return ResponseEntity.ok(new DadosDetalhamentoMedico(medico));
-
-
     }
+
 }

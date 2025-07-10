@@ -1,10 +1,11 @@
 package med.voll.api.controller;
 
-
 import jakarta.validation.Valid;
 import med.voll.api.domain.usuario.DadosAutenticacao;
+import med.voll.api.domain.usuario.Usuario;
+import med.voll.api.infra.security.DadosTokenJWT;
+import med.voll.api.infra.security.TokenService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -13,21 +14,42 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-//Mapeando Controller
+/**
+ * Controlador REST responsável por autenticar usuários e emitir tokens JWT.
+ */
 @RestController
-@RequestMapping("/login")
+@RequestMapping("/login") // Define o endpoint base para operações de login
 public class AutenticacaoController {
 
     @Autowired
-    private AuthenticationManager manager;
+    private AuthenticationManager manager;  // Gerencia o processo de autenticação pelo Spring Security
 
+    @Autowired
+    private TokenService tokenService;     // Serviço para geração de tokens JWT
 
+    /**
+     * Recebe credenciais do usuário, realiza autenticação e retorna um token JWT.
+     *
+     * @param dados DTO com login e senha fornecidos pelo cliente
+     * @return ResponseEntity contendo o token JWT em caso de sucesso
+     */
     @PostMapping
-    public ResponseEntity efetuarLogin(@RequestBody @Valid DadosAutenticacao dados){
-        //AuthenticationManager:
-        var token = new UsernamePasswordAuthenticationToken(dados.login(), dados.senha());
-        var authentication = manager.authenticate(token);
-        //return new ResponseEntity<>(authentication, HttpStatus.OK);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<DadosTokenJWT> efetuarLogin(
+            @RequestBody @Valid DadosAutenticacao dados  // Desserializa JSON e aplica validações
+    ) {
+        // Cria o token de autenticação com login e senha
+        var authenticationToken = new UsernamePasswordAuthenticationToken(
+                dados.login(),   // Nome de usuário
+                dados.senha()    // Senha fornecida
+        );
+
+        // Realiza a autenticação; lança exceção se falhar (BadCredentials)
+        var authentication = manager.authenticate(authenticationToken);
+
+        // Gera o token JWT usando o usuário autenticado (principal)
+        var tokenJWT = tokenService.gerarToken((Usuario) authentication.getPrincipal());
+
+        // Retorna 200 OK com o token encapsulado no DTO DadosTokenJWT
+        return ResponseEntity.ok(new DadosTokenJWT(tokenJWT));
     }
 }
